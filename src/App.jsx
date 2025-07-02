@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 function App() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
+  const scrollRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,9 +16,7 @@ function App() {
     try {
       const res = await fetch("https://hrse-chatbot-backend.onrender.com/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: input }),
       });
 
@@ -27,6 +26,18 @@ function App() {
       setMessages((prev) => [...prev, { role: "bot", text: data.reply }]);
     } catch (error) {
       setMessages((prev) => [...prev, { role: "bot", text: `Fehler: ${error.message}` }]);
+    }
+  };
+
+  // Auto-Scroll beim neuen Eintrag
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
     }
   };
 
@@ -43,14 +54,19 @@ function App() {
                 ...(msg.role === "user" ? styles.user : styles.bot),
               }}
             >
-              {msg.text}
+              <span style={styles.avatar}>
+                {msg.role === "user" ? "👤" : "🤖"}
+              </span>
+              <span>{msg.text}</span>
             </div>
           ))}
+          <div ref={scrollRef} />
         </div>
         <form onSubmit={handleSubmit} style={styles.form}>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
             rows="3"
             placeholder="Deine Frage …"
             style={styles.textarea}
@@ -104,6 +120,13 @@ const styles = {
     fontSize: "1rem",
     whiteSpace: "pre-wrap",
     wordBreak: "break-word",
+    display: "flex",
+    gap: "0.5rem",
+    alignItems: "flex-start",
+  },
+  avatar: {
+    fontSize: "1.2rem",
+    lineHeight: "1.2",
   },
   user: {
     alignSelf: "flex-end",
