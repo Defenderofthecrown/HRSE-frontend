@@ -1,5 +1,9 @@
-// src/App.jsx
 import { useState } from 'react';
+
+const BACKEND_URL =
+  window.location.hostname === 'localhost'
+    ? 'http://localhost:3000'
+    : 'https://hrse-chatbot-backend.onrender.com';
 
 export default function App() {
   const [message, setMessage] = useState('');
@@ -7,15 +11,11 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const backendUrl = import.meta.env.PROD
-    ? 'https://hrse-chatbot-backend.onrender.com'
-    : 'http://localhost:3000';
-
   const sendMessage = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${backendUrl}/api/chat`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -52,7 +52,7 @@ export default function App() {
           className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
           disabled={loading || !message.trim()}
         >
-          {loading ? 'Wird gesendet...' : 'Absenden'}
+          {loading ? 'Wird gesendet…' : 'Absenden'}
         </button>
         {error && (
           <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded text-red-800">
