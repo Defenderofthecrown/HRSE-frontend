@@ -1,168 +1,159 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function App() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem("chat-messages");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [loading, setLoading] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [name, setName] = useState(() => localStorage.getItem("chat-username") || "");
+  const [suggestions, setSuggestions] = useState([]);
   const scrollRef = useRef(null);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
+  useEffect(() => {
+    localStorage.setItem("chat-messages", JSON.stringify(messages));
+  }, [messages]);
 
-    const newMessages = [...messages, { role: "user", text: input }];
-    setMessages(newMessages);
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    if (messages.length === 0) {
+      setMessages([{ role: "bot", text: "Willkommen beim HRSE Chatbot. Wie heisst du?" }]);
+    }
+  }, []);
+
+  const speak = (text) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    speechSynthesis.speak(utterance);
+  };
+
+  const handleSubmit = async (e, overrideText) => {
+    e.preventDefault();
+    const question = overrideText || input.trim();
+    if (!question) return;
     setInput("");
+    const newMessages = [...messages, { role: "user", text: question }];
+    setMessages(newMessages);
+    setLoading(true);
+    setSuggestions([]);
+
+    if (!name) {
+      localStorage.setItem("chat-username", question);
+      setName(question);
+      const reply = `Hallo ${question}, wie kann ich dich im HR unterstützen?`;
+      setMessages([...newMessages, { role: "bot", text: reply }]);
+      setLoading(false);
+      speak(reply);
+      return;
+    }
 
     try {
       const res = await fetch("https://hrse-chatbot-backend.onrender.com/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ message: question })
       });
 
-      if (!res.ok) throw new Error(`Fehler: ${res.status}`);
+      if (!res.ok) throw new Error("Fehler beim Server");
       const data = await res.json();
 
-      setMessages((prev) => [...prev, { role: "bot", text: data.reply }]);
-    } catch (error) {
-      setMessages((prev) => [...prev, { role: "bot", text: `Fehler: ${error.message}` }]);
+      const reply = `Okay, ${name}. ${data.reply}`;
+      setMessages((prev) => [...prev, { role: "bot", text: reply }]);
+      setSuggestions(data.suggestions?.slice(0, 3) || []);
+      speak(reply);
+    } catch (err) {
+      setMessages((prev) => [...prev, { role: "bot", text: `Fehler: ${err.message}` }]);
     }
+    setLoading(false);
   };
 
-  // Auto-Scroll beim neuen Eintrag
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const toggleDark = () => setDarkMode(!darkMode);
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
+  const containerStyle = {
+    minHeight: "100vh",
+    backgroundColor: darkMode ? "#1e1e1e" : "#eef2f8",
+    color: darkMode ? "#eee" : "#111",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    fontFamily: "Arial",
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.chatbox}>
-        <h1 style={styles.title}>HRSE Chatbot</h1>
-        <div style={styles.messages}>
+    <div style={containerStyle}>
+      <div style={{ width: "100%", maxWidth: 600, padding: 20 }}>
+        <h1 style={{ textAlign: "center" }}>
+          {darkMode ? "🌙 " : "☀️ "}HR-Profi Jürg
+          <button onClick={toggleDark} style={{ float: "right" }}>🌓</button>
+        </h1>
+        <div style={{
+          height: "70vh",
+          overflowY: "auto",
+          background: darkMode ? "#2c2c2c" : "#fff",
+          padding: 20,
+          borderRadius: 10,
+          marginBottom: 10,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}>
           {messages.map((msg, i) => (
             <div
               key={i}
               style={{
-                ...styles.bubble,
-                ...(msg.role === "user" ? styles.user : styles.bot),
-              }}
-            >
-              <span style={styles.avatar}>
-                {msg.role === "user" ? "👤" : "🤖"}
-              </span>
-              <span>{msg.text}</span>
+                alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                backgroundColor: msg.role === "user" ? "#0070f3" : darkMode ? "#444" : "#e0e0e0",
+                color: msg.role === "user" ? "#fff" : darkMode ? "#fff" : "#000",
+                padding: "0.75rem 1rem",
+                borderRadius: 12,
+                maxWidth: "75%",
+                whiteSpace: "pre-wrap"
+              }}>
+              {msg.text}
+              {msg.role === "bot" && (
+                <div style={{ marginTop: 5 }}>
+                  <button style={{ marginRight: 5 }}>👍</button>
+                  <button>👎</button>
+                </div>
+              )}
             </div>
           ))}
+          {loading && <div>🤖 schreibt …</div>}
           <div ref={scrollRef} />
         </div>
-        <form onSubmit={handleSubmit} style={styles.form}>
+
+        {suggestions.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            {suggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={(e) => handleSubmit(e, s)}
+                style={{ marginRight: 5, marginBottom: 5 }}>
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows="3"
-            placeholder="Deine Frage …"
-            style={styles.textarea}
+            rows={3}
+            placeholder="Stelle deine Frage …"
+            style={{ padding: 10, fontSize: "1rem", borderRadius: 5 }}
           />
-          <button type="submit" style={styles.button}>Absenden</button>
+          <button type="submit" style={{ padding: 10, fontSize: "1rem", background: "#0070f3", color: "#fff", border: "none", borderRadius: 5 }}>
+            Absenden
+          </button>
         </form>
       </div>
     </div>
   );
 }
-
-const styles = {
-  container: {
-    minHeight: "100vh",
-    backgroundColor: "#eef2f8",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    fontFamily: "Arial, sans-serif",
-  },
-  chatbox: {
-    backgroundColor: "#fff",
-    padding: "1.5rem",
-    borderRadius: "1rem",
-    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-    width: "95%",
-    maxWidth: "600px",
-    display: "flex",
-    flexDirection: "column",
-    height: "90vh",
-  },
-  title: {
-    textAlign: "center",
-    marginBottom: "1rem",
-    fontSize: "1.5rem",
-    fontWeight: "bold",
-    color: "#333",
-  },
-  messages: {
-    flex: 1,
-    overflowY: "auto",
-    padding: "1rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  bubble: {
-    maxWidth: "75%",
-    padding: "0.75rem 1rem",
-    borderRadius: "1rem",
-    fontSize: "1rem",
-    whiteSpace: "pre-wrap",
-    wordBreak: "break-word",
-    display: "flex",
-    gap: "0.5rem",
-    alignItems: "flex-start",
-  },
-  avatar: {
-    fontSize: "1.2rem",
-    lineHeight: "1.2",
-  },
-  user: {
-    alignSelf: "flex-end",
-    backgroundColor: "#0070f3",
-    color: "#fff",
-    borderTopRightRadius: 0,
-  },
-  bot: {
-    alignSelf: "flex-start",
-    backgroundColor: "#f1f1f1",
-    color: "#333",
-    borderTopLeftRadius: 0,
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.5rem",
-    marginTop: "1rem",
-  },
-  textarea: {
-    fontSize: "1rem",
-    padding: "1rem",
-    borderRadius: "0.5rem",
-    border: "1px solid #ccc",
-    resize: "vertical",
-  },
-  button: {
-    padding: "0.75rem",
-    backgroundColor: "#0070f3",
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: "1rem",
-    border: "none",
-    borderRadius: "0.5rem",
-    cursor: "pointer",
-  },
-};
 
 export default App;
