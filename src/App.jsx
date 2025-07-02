@@ -8,7 +8,7 @@ function App() {
     e.preventDefault();
 
     try {
-      const res = await fetch("https://hrse-chatbot-backend.onrender.com/chat", {
+      const res = await fetch("https://hrse-chatbot-backend.onrender.com/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -21,7 +21,7 @@ function App() {
       }
 
       const data = await res.json();
-      setResponse(data.response);
+      setResponse(data.reply);
     } catch (error) {
       setResponse(`Fehler: ${error.message}`);
     }
