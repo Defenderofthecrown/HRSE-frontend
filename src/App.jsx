@@ -1,3 +1,4 @@
+// src/App.jsx
 import { useState } from 'react';
 
 export default function App() {
@@ -6,16 +7,15 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const API_URL =
-    import.meta.env.MODE === 'development'
-      ? 'http://localhost:3000/api/chat'
-      : 'https://hrse-chatbot-backend.onrender.com/api/chat';
+  const backendUrl = import.meta.env.PROD
+    ? 'https://hrse-chatbot-backend.onrender.com'
+    : 'http://localhost:3000';
 
   const sendMessage = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(API_URL, {
+      const res = await fetch(`${backendUrl}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
